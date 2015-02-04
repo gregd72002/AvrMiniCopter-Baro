@@ -1,0 +1,5 @@
+#!/bin/sh
+if [ "$1" == "start"  ]; then
+/usr/local/bin/avrbaro.sh & 
+fi
+exit 0;

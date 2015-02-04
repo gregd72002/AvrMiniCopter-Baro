@@ -36,5 +36,6 @@ install:
 clean:
 	cd bmpsensor && $(MAKE) clean
 	cd libs/i2cdev && $(MAKE) clean
-	rm -rf avrbaro 
+	rm -rf avrbaro
+	rm -rf *.o
 

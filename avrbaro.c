@@ -8,9 +8,8 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
+#include <sys/ioctl.h>
+#include <sys/un.h>
 #include <stdlib.h>
 #include <time.h>
 #include <sched.h>
@@ -28,25 +27,36 @@ int stop = 0;
 int bs_err = 0;
 int initialized = 0;
 
-int sock = 0;
-char sock_path[256] = "127.0.0.1";
-int portno = 1030;
-struct sockaddr_in address;
+int sock = 0,len;
+char sock_path[256] = "/dev/avrspi";
+struct sockaddr_un address;
+unsigned char buf[256];
 
 int verbose = 0;
 int delay;
 
 int sendMsg(int t, int v) {
-	static unsigned char buf[4];
 	static struct local_msg m;
+	int count = 0;
 	m.c = 0;
 	m.t = t;
 	m.v = v;
 	pack_lm(buf,&m);
-	ret = sendto(sock,buf,LOCAL_MSG_SIZE,0,(struct sockaddr *)&address,sizeof(address));
+	ret = write(sock,buf,LOCAL_MSG_SIZE);
 	if (ret<=0) {
 		perror("AVRBARO: writing");
+		stop = 1;
 	}
+
+	if (ioctl(sock, TIOCINQ, &count)!=0) {
+		printf("Ioctl failed.\n");
+		stop = 1;
+	}
+
+	if (count) { //read any available data
+		ret = read(sock,buf,256);
+	}
+
 	return 0;
 }
 
@@ -76,17 +86,30 @@ void init() {
 }
 
 int setup() {
-	sock=socket(AF_INET,SOCK_DGRAM,0);
+	sock=socket(AF_UNIX,SOCK_STREAM,0);
 	if (sock<0) {
-		perror("AVRBARO: openning datagram socket");
+		perror("AVRBARO: openning unix socket");
 		return -1;
 	}
 
 	bzero(&address,sizeof(address));
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr=inet_addr(sock_path);
-	address.sin_port=htons(portno);
+	address.sun_family = AF_UNIX;
+	strcpy(address.sun_path, sock_path);
+	len = strlen(address.sun_path) + sizeof(address.sun_family);
+	if (connect(sock, (struct sockaddr *) &address, len) < 0) {
+		close(sock);
+		printf("%s\n",sock_path);
+		perror("connecting socket");
+		printf("Check if avrspi is running\n");
+		return -1;
+	}
 
+	buf[0] = 1;
+	if (write(sock,buf,1)!=1) {
+		perror("Sending");
+		return -1;
+	}
+	
 	return 0;
 }
 
@@ -136,8 +159,7 @@ void loop() {
 void print_usage() {
 	printf("-b - run in the background\n");
 	printf("-v [level] - verbose mode\n");
-	printf("-a [addr] - address to connect to (defaults to 127.0.0.1)\n");
-	printf("-p [port] - port to connect to (default to 1030)\n");
+	printf("-u [SOCKET] - socket to connect to (defaults to %s)\n",sock_path);
 }
 
 int main(int argc, char **argv) {
@@ -151,8 +173,7 @@ int main(int argc, char **argv) {
 		switch (option)  {
 			case 'b': background = 1; break;
 			case 'v': verbose=atoi(optarg); break;
-			case 'a': strcpy(sock_path,optarg); break;
-			case 'p': portno = atoi(optarg); break;
+			case 'u': strcpy(sock_path,optarg); break;
 			default:
 				  print_usage();
 				  return -1;

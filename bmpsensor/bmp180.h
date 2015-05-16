@@ -19,27 +19,20 @@
 #ifndef BMP180_h
 #define BMP180_h
 
-struct s_bs {
-        float t;
-        float p;
-        float p0;
-        float alt;
-};
+#include "../avrbaro.h"
+#include <inttypes.h>
 
-extern struct s_bs bs;
-
-int bs_open();
-int bs_update(unsigned long t_ms);
-int bs_reset();
+int bs_open(uint8_t _addr);
+int bs_update(struct s_baro *s);
 int bs_close();
+
+int getPressure(float &P);
+int preparePressure(int oversampling);
+int getTemperature(float &T);
+int prepareTemperature(void);
 
 int bsWriteBytes(unsigned char *values, char length);
 int bsReadBytes(unsigned char *values, char length);
 int bsReadU(unsigned char address, unsigned short &value);
 int bsReadS(unsigned char address, short &value);
-float altitude(float P, float P0);
-int getPressure(float &P);
-int preparePressure(int oversampling);
-int getTemperature(float &T);
-int prepareTemperature(void);
 #endif

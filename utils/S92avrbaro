@@ -1,5 +1,17 @@
 #!/bin/sh
+MODEL=`cut -f1 /etc/avrminicopter/baro.config`
+ADDR=`cut -f2 /etc/avrminicopter/baro.config`
+
 if [ "$1" == "start"  ]; then
-/usr/local/bin/avrbaro.sh & 
+/usr/local/bin/avrbaro -t $MODEL -a $ADDR & 
+fi
+if [ "$1" == "stop"  ]; then
+killall avrbaro 
+fi
+if [ "$1" == "restart"  ]; then
+killall avrbaro 
+/usr/local/bin/avrbaro -t $MODEL -a $ADDR & 
 fi
 exit 0;
+
+

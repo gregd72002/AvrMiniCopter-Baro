@@ -25,9 +25,10 @@ buy me a (root) beer someday.
 #define OVERSAMPLING 3 //oversampling_setting
 #define PRESSURE_DELAY 26000 //us 
 #define TEMPERATURE_DELAY 5000 //us  
+
 #define delay_ms(a)    usleep(a*1000)
 
-#define BMP180_ADDR 0x77 // 7-bit address
+static uint8_t addr;
 
 #define BMP180_REG_CONTROL 0xF4
 #define BMP180_REG_RESULT 0xF6
@@ -37,11 +38,6 @@ buy me a (root) beer someday.
 #define BMP180_COMMAND_PRESSURE1 0x74
 #define BMP180_COMMAND_PRESSURE2 0xB4
 #define BMP180_COMMAND_PRESSURE3 0xF4
-
-static int state = 0;
-static unsigned long dt;
-
-struct s_bs bs; 
 
 struct s_cc {
 	short AC1,AC2,AC3,B1,B2,MB,MC,MD;
@@ -59,15 +55,10 @@ static long *p_buf_ptr = p_buffer;
 static long *t_buf_ptr = t_buffer;
 
 
-int bs_open()
+int bs_open(uint8_t _addr)
 	// Initialize library for subsequent pressure measurements
 {
-	bs.t = 1.f;
-	bs.p = 1.f;
-	bs.p0 = 1.f;
-	bs.alt = 1.f;
-
-
+	addr = _addr;
 	// The BMP180 includes factory calibration data stored on the device.
 	// Each device has different numbers, these must be retrieved and
 	// used in the calculations when taking pressure measurements.
@@ -129,8 +120,8 @@ int bs_open()
 
 		// Compute floating-point polynominals:
 
+		delay_ms(50);
 		// Success!
-		bs_reset();
 		return(0);
 	}
 	else
@@ -141,75 +132,31 @@ int bs_open()
 	}
 }
 
-int bs_reset() {
-	float p0 = 0;
-	for (int i=0;i<BUF_SIZE*10;i++) { //get some initial samples 
-		if (prepareTemperature()<0) {
-			printf("error setting temp\n");
-			return -1;
-		}
-		delay_ms(TEMPERATURE_DELAY/1000);
-		if (getTemperature(bs.t)<0) {
-			printf("error getting temp\n");
-			return -1;
-		}
-		if (preparePressure(OVERSAMPLING)<0) {
-			printf("error setting pressure\n");
-			return -1;
-		}
-		delay_ms(PRESSURE_DELAY/1000);
-		if (getPressure(bs.p)<0) {
-			printf("error getting pressure\n");
-			return -1;
-		}
-
-		p0 += bs.p;
-
-		bs.p0 = bs.p;
-		bs.alt = altitude(bs.p, bs.p0);
-	}
-
-	bs.p0 = p0 / (BUF_SIZE*10);
-	bs.alt = altitude(bs.p, bs.p0);
-
+int bs_update(struct s_baro *s) { //since the last call 
 	if (prepareTemperature()<0) {
 		printf("error setting temp\n");
 		return -1;
 	}
-	delay_ms(TEMPERATURE_DELAY/1000);
-	dt = 0;
-	state = 0;
-	return 0;
-}
+	
+	delay_ms((TEMPERATURE_DELAY/1000));
 
-int bs_update(unsigned long t_ms) { //since the last update
-	if (state == 0 && (t_ms-dt)>(TEMPERATURE_DELAY/1000))  {
-		dt = t_ms;
-		state = 1;
-		if (getTemperature(bs.t)<0) {
-			printf("error getting temp\n");
-			return -1;
-		}
-		if (preparePressure(OVERSAMPLING)<0) { 
-			printf("error setting pressure\n");
-			return -1;
-		}
-		return 1; 
+	if (getTemperature(s->t)<0) {
+		printf("error getting temp\n");
+		return -1;
 	}
-	if (state==1 && (t_ms-dt)>(PRESSURE_DELAY/1000)) { //_DELAY provided in us thus converting to ms
-		dt = 0;
-		state = 0;
-		if (getPressure(bs.p)<0) {
-			printf("error getting pressure\n");
-			return -1;
-		}
-		bs.alt = altitude(bs.p, bs.p0); 
-		if (prepareTemperature()<0) {
-			printf("error setting temp\n");
-			return -1;
-		}
-		return 2; //end of cycle
+
+	if (preparePressure(OVERSAMPLING)<0) { 
+		printf("error setting pressure\n");
+		return -1;
 	}
+
+	delay_ms((PRESSURE_DELAY/1000));
+
+	if (getPressure(s->p)<0) {
+		printf("error getting pressure\n");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -357,14 +304,6 @@ int getPressure(float &P)
 }
 
 
-float altitude(float P, float P0)
-	// Given a pressure measurement P (mb) and the pressure at a baseline P0 (mb),
-	// return altitude (meters) above baseline.
-{
-	return round(10.0f*44330.0f*(1.0f-pow(P/P0,1.0f/5.255f)))/10.0f;
-}
-
-
 int bsReadS(unsigned char address, short &value)
 	// Read a signed integer (two bytes) from device
 	// address: register to start reading (plus subsequent register)
@@ -412,7 +351,7 @@ int bsReadBytes(unsigned char *values, char length)
 	// values: external array to hold data. Put starting register in values[0].
 	// length: number of bytes to read
 {
-	return readBytes(BMP180_ADDR,values[0],length,values); //return number of bytes read
+	return readBytes(addr,values[0],length,values); //return number of bytes read
 }
 
 
@@ -421,7 +360,7 @@ int bsWriteBytes(unsigned char *values, char length)
 	// values: external array of data to write. Put starting register in values[0].
 	// length: number of bytes to write
 {
-	ret=writeBytes(BMP180_ADDR,values[0],length-1,values+1);
+	ret=writeBytes(addr,values[0],length-1,values+1);
 	return ret;
 }
 

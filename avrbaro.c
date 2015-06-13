@@ -147,9 +147,11 @@ int setup() {
 	len = strlen(address.sun_path) + sizeof(address.sun_family);
 	if (connect(sock, (struct sockaddr *) &address, len) < 0) {
 		close(sock);
-		printf("%s\n",sock_path);
-		perror("connecting socket");
-		printf("Check if avrspi is running\n");
+		if (verbose) {
+			printf("%s\n",sock_path);
+			perror("connecting socket");
+			printf("Check if avrspi is running\n");
+		}
 		return -1;
 	}
 

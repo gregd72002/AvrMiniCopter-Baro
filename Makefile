@@ -37,7 +37,7 @@ install:
 	$(INSTALL) -m 755 utils/S92avrbaro $(DESTDIR)/etc/init.d/
 	$(INSTALL) -m 755 avrbaro $(DESTDIR)/usr/local/bin/
 	$(INSTALL) -m 0755 -d $(DESTDIR)/etc/avrminicopter/
-	$(INSTALL) -m 755 utils/baro.config $(DESTDIR)/etc/avrminicopter/
+	$(INSTALL) -m 777 utils/baro.config $(DESTDIR)/etc/avrminicopter/
 
 clean:
 	cd bmpsensor && $(MAKE) clean
